@@ -13,6 +13,7 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <signal.h>
+#include <inttypes.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <netinet/in.h>
@@ -1024,7 +1025,7 @@ int getFileContentEx(const char *filename, char *buff, \
 	if (*size <= 0)
 	{
 		logError("file: "__FILE__", line: %d, " \
-			"invalid size: "INT64_PRINTF_FORMAT, \
+			"invalid size: %"PRId64, \
 			__LINE__, *size);
 		return EINVAL;
 	}
@@ -1138,6 +1139,20 @@ int safeWriteToFile(const char *filename, const char *buff, \
 	}
 
 	return 0;
+}
+
+void short2buff(const short n, char *buff)
+{
+	unsigned char *p;
+	p = (unsigned char *)buff;
+	*p++ = (n >> 8) & 0xFF;
+	*p++ = n & 0xFF;
+}
+
+short buff2short(const char *buff)
+{
+	return  (short)((((unsigned char)(*(buff))) << 8) | \
+		((unsigned char)(*(buff+1))));
 }
 
 void int2buff(const int n, char *buff)
@@ -1756,8 +1771,7 @@ int parse_bytes(char *pStr, const int default_unit_bytes, int64_t *bytes)
 	if (*bytes < 0)
 	{
 		logError("file: "__FILE__", line: %d, " \
-			"bytes: "INT64_PRINTF_FORMAT" < 0", \
-			__LINE__, *bytes);
+			"bytes: %"PRId64" < 0", __LINE__, *bytes);
 		return EINVAL;
 	}
 

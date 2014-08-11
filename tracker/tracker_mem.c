@@ -1917,45 +1917,45 @@ int tracker_save_storages()
 				"\t%s=%d\n" \
 				"\t%s=%d\n" \
 				"\t%s=%d\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
+				"\t%s=%"PRId64"\n" \
 				"\t%s=%d\n" \
 				"\t%s=%d\n" \
 				"\t%s=%d\n" \
 				"\t%s=%d\n" \
-				"\t%s="INT64_PRINTF_FORMAT"\n\n", \
+				"\t%s=%"PRId64"\n\n", \
 				pStorage->ip_addr, pStorage->storage_port, \
 				STORAGE_SECTION_NAME_PREFIX, count, id_buff, \
 				STORAGE_ITEM_GROUP_NAME, \
@@ -2940,6 +2940,7 @@ static int tracker_mem_realloc_store_servers(FDFSGroupInfo *pGroup, \
 			{
 				free(new_servers);
 				free(new_sorted_servers);
+		        free(new_active_servers);
 
 				return result;
 			}
@@ -3699,7 +3700,7 @@ int tracker_mem_get_status(ConnectionInfo *pTrackerServer, \
 	{
 		logError("file: "__FILE__", line: %d, " \
 			"tracker server %s:%d response data " \
-			"length: "INT64_PRINTF_FORMAT" is invalid, " \
+			"length: %"PRId64" is invalid, " \
 			"expect length: %d.", __LINE__, \
 			pTrackerServer->ip_addr, pTrackerServer->port, \
 			in_bytes, (int)sizeof(in_buff));
@@ -3787,7 +3788,7 @@ static int tracker_mem_get_sys_file_piece(ConnectionInfo *pTrackerServer, \
 	{
 		logError("file: "__FILE__", line: %d, " \
 			"tracker server %s:%d response data " \
-			"length: "INT64_PRINTF_FORMAT" is invalid, " \
+			"length: %"PRId64" is invalid, " \
 			"expect length >= %d.", __LINE__, \
 			pTrackerServer->ip_addr, pTrackerServer->port, \
 			in_bytes, FDFS_PROTO_PKG_LEN_SIZE);
@@ -3800,7 +3801,7 @@ static int tracker_mem_get_sys_file_piece(ConnectionInfo *pTrackerServer, \
 	if (*file_size < 0)
 	{
 		logError("file: "__FILE__", line: %d, " \
-			"tracker server %s:%d, file size: "INT64_PRINTF_FORMAT\
+			"tracker server %s:%d, file size: %"PRId64\
 			" < 0", __LINE__, pTrackerServer->ip_addr, \
 			pTrackerServer->port, *file_size);
 		return EINVAL;
@@ -3809,7 +3810,7 @@ static int tracker_mem_get_sys_file_piece(ConnectionInfo *pTrackerServer, \
 	if (*file_size > 0 && write_bytes == 0)
 	{
 		logError("file: "__FILE__", line: %d, " \
-			"tracker server %s:%d, file size: "INT64_PRINTF_FORMAT\
+			"tracker server %s:%d, file size: %"PRId64\
 			" > 0, but file content is empty", __LINE__, \
 			pTrackerServer->ip_addr, pTrackerServer->port, \
 			*file_size);
@@ -3917,6 +3918,15 @@ static int tracker_mem_cmp_tracker_running_status(const void *p1, const void *p2
 
 	pStatus1 = (TrackerRunningStatus *)p1;
 	pStatus2 = (TrackerRunningStatus *)p2;
+
+    if (pStatus1->if_leader)
+    {
+        return 1;
+    }
+    else if (pStatus2->if_leader)
+    {
+        return -1;
+    }
 
 	sub = pStatus1->running_time - pStatus2->running_time;
 	if (sub != 0)
@@ -4107,23 +4117,20 @@ static int tracker_mem_get_tracker_server(FDFSStorageJoinBody *pJoinBody, \
 		return result == 0 ? ENOENT : result;
 	}
 
-	if (count == 1)
+	if (count > 1)
 	{
-		memcpy(pTrackerStatus, trackerStatus, \
-			sizeof(TrackerRunningStatus));
-		return 0;
+		qsort(trackerStatus, count, sizeof(TrackerRunningStatus), \
+			tracker_mem_cmp_tracker_running_status);
 	}
-
-	qsort(trackerStatus, count, sizeof(TrackerRunningStatus), \
-		tracker_mem_cmp_tracker_running_status);
 
 	for (i=0; i<count; i++)
 	{
 		logDebug("file: "__FILE__", line: %d, " \
-			"%s:%d running time: %d, restart interval: %d", \
-			__LINE__, \
+			"%s:%d leader: %d, running time: %d, " \
+			"restart interval: %d", __LINE__, \
 			trackerStatus[i].pTrackerServer->ip_addr, \
 			trackerStatus[i].pTrackerServer->port, \
+			trackerStatus[i].if_leader, \
 			trackerStatus[i].running_time, \
 			trackerStatus[i].restart_interval);
 	}
@@ -4238,6 +4245,7 @@ int tracker_mem_add_group_and_storage(TrackerClientInfo *pClientInfo, \
 		{ /* stop time exceeds 2 * interval */
 			TrackerRunningStatus runningStatus;
 
+			runningStatus.if_leader = false;
 			tracker_calc_running_times(&runningStatus);
 			result = tracker_mem_get_sys_files_from_others(\
 						pJoinBody, &runningStatus);
@@ -4647,7 +4655,7 @@ int tracker_mem_add_group_and_storage(TrackerClientInfo *pClientInfo, \
 
 	logDebug("file: "__FILE__", line: %d, " \
 		"storage server %s::%s join in, remain changelog bytes: " \
-		INT64_PRINTF_FORMAT, __LINE__, \
+		"%"PRId64, __LINE__, \
 		pClientInfo->pGroup->group_name, ip_addr, \
 	 	g_changelog_fsize - pStorageServer->changelog_offset);
 
@@ -4828,7 +4836,7 @@ static int _storage_get_trunk_binlog_size(
 	{
 		logError("file: "__FILE__", line: %d, " \
 			"storage server %s:%d, recv body length: " \
-			INT64_PRINTF_FORMAT" != %d",  \
+			"%"PRId64" != %d",  \
 			__LINE__, pStorageServer->ip_addr, \
 			pStorageServer->port, in_bytes, (int)sizeof(in_buff));
 		return EINVAL;
@@ -4859,7 +4867,7 @@ static int tracker_mem_get_trunk_binlog_size(
 
 
 	logDebug("file: "__FILE__", line: %d, " \
-		"storage %s:%d, trunk binlog file size: "INT64_PRINTF_FORMAT, \
+		"storage %s:%d, trunk binlog file size: %"PRId64, \
 		__LINE__, storage_server.ip_addr, storage_server.port, \
 		*file_size);
 	return result;

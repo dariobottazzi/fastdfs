@@ -19,26 +19,26 @@ static void deal_ioevents(IOEventPoller *ioevent, const int count)
 static void deal_timeouts(FastTimerEntry *head)
 {
 	FastTimerEntry *entry;
-	FastTimerEntry *curent;
+	FastTimerEntry *current;
 	IOEventEntry *pEventEntry;
 
 	entry = head->next;
 	while (entry != NULL)
 	{
-		curent = entry;
+		current = entry;
 		entry = entry->next;
 
-		pEventEntry = (IOEventEntry *)curent->data;
+		pEventEntry = (IOEventEntry *)current->data;
 		if (pEventEntry != NULL)
 		{
 			pEventEntry->callback(pEventEntry->fd, IOEVENT_TIMEOUT,
-						curent->data);
+						current->data);
 		}
 	}
 }
 
 int ioevent_loop(struct nio_thread_data *pThreadData,
-	IOEventCallback recv_notify_callback, TaskCleanUpCallBack
+	IOEventCallback recv_notify_callback, TaskCleanUpCallback
 	clean_up_callback, volatile bool *continue_flag)
 {
 	int result;
@@ -109,6 +109,10 @@ int ioevent_loop(struct nio_thread_data *pThreadData,
 				deal_timeouts(&head);
 			}
 		}
+
+        if (pThreadData->thread_loop_callback != NULL) {
+            pThreadData->thread_loop_callback(pThreadData);
+        }
 	}
 
 	return 0;

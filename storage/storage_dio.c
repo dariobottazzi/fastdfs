@@ -192,13 +192,10 @@ int storage_dio_queue_push(struct fast_task_info *pTask)
 int storage_dio_get_thread_index(struct fast_task_info *pTask, \
 		const int store_path_index, const char file_op)
 {
-	StorageClientInfo *pClientInfo;
 	struct storage_dio_thread_data *pThreadData;
 	struct storage_dio_context *contexts;
 	struct storage_dio_context *pContext;
 	int count;
-
-	pClientInfo = (StorageClientInfo *)pTask->arg;
 
 	pThreadData = g_dio_thread_data + store_path_index;
 	if (g_disk_rw_separated)
@@ -591,7 +588,7 @@ int dio_truncate_file(struct fast_task_info *pTask)
 		result = errno != 0 ? errno : EIO;
 		logError("file: "__FILE__", line: %d, " \
 			"truncate file: %s fail, fd=%d, " \
-			"remain_bytes="INT64_PRINTF_FORMAT", " \
+			"remain_bytes=%"PRId64", " \
 			"errno: %d, error info: %s", \
 			__LINE__, pFileContext->filename, \
 			pFileContext->fd, pFileContext->offset, \
@@ -693,7 +690,7 @@ void dio_append_finish_clean_up(struct fast_task_info *pTask)
 				logDebug("file: "__FILE__", line: %d, " \
 					"client ip: %s, append file fail, " \
 					"call ftruncate of file %s to size: "\
-					INT64_PRINTF_FORMAT, \
+					"%"PRId64, \
 					__LINE__, pTask->client_ip, \
 					pFileContext->filename, \
 					pFileContext->start);
@@ -883,7 +880,7 @@ int dio_check_trunk_file_ex(int fd, const char *filename, const int64_t offset)
 
 			logError("file: "__FILE__", line: %d, " \
 				"trunk file: %s, offset: " \
-				INT64_PRINTF_FORMAT" already occupied" \
+				"%"PRId64" already occupied" \
 				" by other file, trunk header info: %s"\
 				, __LINE__, filename, offset, buff);
 			return EEXIST;

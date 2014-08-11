@@ -19,10 +19,12 @@
 #include "ioevent.h"
 #include "fast_timer.h"
 
+struct nio_thread_data;
 struct fast_task_info;
 
-typedef int (*TaskFinishCallBack) (struct fast_task_info *pTask);
-typedef void (*TaskCleanUpCallBack) (struct fast_task_info *pTask);
+typedef int (*ThreadLoopCallback) (struct nio_thread_data *pThreadData);
+typedef int (*TaskFinishCallback) (struct fast_task_info *pTask);
+typedef void (*TaskCleanUpCallback) (struct fast_task_info *pTask);
 
 typedef void (*IOEventCallback) (int sock, short event, void *arg);
 
@@ -37,21 +39,23 @@ struct nio_thread_data
 {
 	struct ioevent_puller ev_puller;
 	struct fast_timer timer;
-        int pipe_fds[2];
+	int pipe_fds[2];
 	struct fast_task_info *deleted_list;
+    ThreadLoopCallback thread_loop_callback;
+	void *arg;   //extra argument pointer
 };
 
 struct fast_task_info
 {
-	IOEventEntry event;
+	IOEventEntry event;  //must first
 	char client_ip[IP_ADDRESS_SIZE];
 	void *arg;  //extra argument pointer
 	char *data; //buffer for write or recv
 	int size;   //alloc size
 	int length; //data length
 	int offset; //current offset
-	int req_count; //request count
-	TaskFinishCallBack finish_callback;
+	int64_t req_count; //request count
+	TaskFinishCallback finish_callback;
 	struct nio_thread_data *thread_data;
 	struct fast_task_info *next;
 };

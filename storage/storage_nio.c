@@ -287,7 +287,7 @@ static void client_sock_read(int sock, short event, void *arg)
 
 	if (event & IOEVENT_ERROR)
 	{
-		logError("file: "__FILE__", line: %d, " \
+		logDebug("file: "__FILE__", line: %d, " \
 			"client ip: %s, recv error event: %d, "
 			"close connection", __LINE__, pTask->client_ip, event);
 
@@ -310,7 +310,7 @@ static void client_sock_read(int sock, short event, void *arg)
 		}
 
 		/*
-		logInfo("total_length="INT64_PRINTF_FORMAT", recv_bytes=%d, "
+		logInfo("total_length=%"PRId64", recv_bytes=%d, "
 			"pTask->length=%d, pTask->offset=%d",
 			pClientInfo->total_length, recv_bytes, 
 			pTask->length, pTask->offset);
@@ -321,6 +321,10 @@ static void client_sock_read(int sock, short event, void *arg)
 		{
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 			{
+			}
+			else if (errno == EINTR)
+			{
+				continue;
 			}
 			else
 			{
@@ -360,7 +364,7 @@ static void client_sock_read(int sock, short event, void *arg)
 			{
 				logError("file: "__FILE__", line: %d, " \
 					"client ip: %s, pkg length: " \
-					INT64_PRINTF_FORMAT" < 0", \
+					"%"PRId64" < 0", \
 					__LINE__, pTask->client_ip, \
 					pClientInfo->total_length);
 
@@ -434,7 +438,7 @@ static void client_sock_write(int sock, short event, void *arg)
 
 	if (event & IOEVENT_ERROR)
 	{
-		logError("file: "__FILE__", line: %d, " \
+		logDebug("file: "__FILE__", line: %d, " \
 			"client ip: %s, recv error event: %d, "
 			"close connection", __LINE__, pTask->client_ip, event);
 
@@ -455,6 +459,10 @@ static void client_sock_write(int sock, short event, void *arg)
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 			{
 				set_send_event(pTask);
+			}
+			else if (errno == EINTR)
+			{
+				continue;
 			}
 			else
 			{

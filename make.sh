@@ -58,7 +58,7 @@ EOF
 
 ENABLE_STATIC_LIB=0
 ENABLE_SHARED_LIB=1
-TARGET_PREFIX=/usr/local
+TARGET_PREFIX=/usr
 TARGET_CONF_PATH=/etc/fdfs
 
 #WITH_LINUX_SERVICE=1
@@ -76,8 +76,11 @@ LIBS=''
 uname=$(uname)
 if [ "$uname" = "Linux" ]; then
   CFLAGS="$CFLAGS -DOS_LINUX -DIOEVENT_USE_EPOLL"
-elif [ "$uname" = "FreeBSD" ]; then
+elif [ "$uname" = "FreeBSD" ] || [ "$uname" = "Darwin" ]; then
   CFLAGS="$CFLAGS -DOS_FREEBSD -DIOEVENT_USE_KQUEUE"
+  if [ "$uname" = "Darwin" ]; then
+    CFLAGS="$CFLAGS -DDARWIN"
+  fi
 elif [ "$uname" = "SunOS" ]; then
   CFLAGS="$CFLAGS -DOS_SUNOS -D_THREAD_SAFE -DIOEVENT_USE_PORT"
   LIBS="$LIBS -lsocket -lnsl -lresolv"
@@ -121,7 +124,7 @@ elif [ "$uname" = "FreeBSD" ]; then
   fi
 fi
 
-if [ $have_pthread -eq 0 ]; then
+if [ $have_pthread -eq 0 ] && [ "$uname" != "Darwin" ]; then
    /sbin/ldconfig -p | fgrep libpthread.so > /dev/null
    if [ $? -eq 0 ]; then
       LIBS="$LIBS -lpthread"
