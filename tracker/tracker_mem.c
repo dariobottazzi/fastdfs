@@ -3373,6 +3373,87 @@ static void tracker_mem_clear_storage_fields(FDFSStorageDetail *pStorageServer)
 	memset(&(pStorageServer->stat), 0, sizeof(FDFSStorageStat));
 }
 
+static int tracker_mem_remove_group(FDFSGroupInfo **groups, FDFSGroupInfo *pGroup)
+{
+	FDFSGroupInfo **ppGroup;
+	FDFSGroupInfo **ppEnd;
+	FDFSGroupInfo **pp;
+
+    ppEnd = groups + g_groups.count;
+    for (ppGroup=groups; ppGroup<ppEnd; ppGroup++)
+    {
+        if (*ppGroup == pGroup)
+        {
+            break;
+        }
+    }
+
+    if (ppGroup == ppEnd)
+    {
+        return ENOENT;
+    }
+
+    for (pp=ppGroup + 1; pp<ppEnd; pp++)
+    {
+        *(pp - 1) = *pp;
+    }
+
+    return 0;
+}
+
+int tracker_mem_delete_group(const char *group_name)
+{
+    FDFSGroupInfo *pGroup;
+    int result;
+
+    pGroup = tracker_mem_get_group(group_name);
+    if (pGroup == NULL)
+    {
+        return ENOENT;
+    }
+
+    if (pGroup->count != 0)
+    {
+        return EBUSY;
+    }
+
+	pthread_mutex_lock(&mem_thread_lock);
+    if (pGroup->count != 0)
+    {
+        result = EBUSY;
+    }
+    else
+    {
+    result = tracker_mem_remove_group(g_groups.groups, pGroup);
+    if (result == 0)
+    {
+        result = tracker_mem_remove_group(g_groups.sorted_groups, pGroup);
+    }
+    }
+    if (result == 0)
+    {
+        if (g_groups.pStoreGroup == pGroup)
+        {
+            g_groups.pStoreGroup = NULL;
+        }
+        g_groups.count--;
+    }
+	pthread_mutex_unlock(&mem_thread_lock);
+
+    if (result != 0)
+    {
+        return result;
+    }
+
+    logDebug("file: "__FILE__", line: %d, " \
+            "delete empty group: %s", \
+            __LINE__, group_name);
+    sleep(1);
+    free(pGroup);
+
+    return tracker_save_groups();
+}
+
 int tracker_mem_delete_storage(FDFSGroupInfo *pGroup, const char *id)
 {
 	FDFSStorageDetail *pStorageServer;
@@ -3407,6 +3488,11 @@ int tracker_mem_delete_storage(FDFSGroupInfo *pGroup, const char *id)
 			(*ppServer)->psync_src_server = NULL;
 		}
 	}
+
+    logDebug("file: "__FILE__", line: %d, " \
+            "delete storage server: %s:%d, group: %s", \
+            __LINE__, pStorageServer->ip_addr,
+            pStorageServer->storage_port, pGroup->group_name);
 
 	tracker_mem_clear_storage_fields(pStorageServer);
 
@@ -4690,9 +4776,7 @@ int tracker_mem_sync_storages(FDFSGroupInfo *pGroup, \
 		{
 			pServer->id[FDFS_STORAGE_ID_MAX_SIZE - 1] = '\0';
 			pServer->ip_addr[IP_ADDRESS_SIZE - 1] = '\0';
-			if (pServer->status == FDFS_STORAGE_STATUS_NONE \
-			 || pServer->status == FDFS_STORAGE_STATUS_ACTIVE \
-			 || pServer->status == FDFS_STORAGE_STATUS_ONLINE)
+			if (pServer->status == FDFS_STORAGE_STATUS_NONE)
 			{
 				continue;
 			}
@@ -4709,6 +4793,8 @@ int tracker_mem_sync_storages(FDFSGroupInfo *pGroup, \
 			{
 				if ((*ppFound)->status == pServer->status \
 				 || (*ppFound)->status == \
+					FDFS_STORAGE_STATUS_INIT \
+				 || (*ppFound)->status == \
 					FDFS_STORAGE_STATUS_ONLINE \
 				 || (*ppFound)->status == \
 					FDFS_STORAGE_STATUS_ACTIVE
@@ -4717,6 +4803,13 @@ int tracker_mem_sync_storages(FDFSGroupInfo *pGroup, \
 				{
 					continue;
 				}
+
+                logWarning("file: "__FILE__", line: %d, "
+                        "storage server: %s:%d, dest status: %d, "
+                        "my status: %d, should change my status!",
+                        __LINE__, (*ppFound)->ip_addr,
+                        (*ppFound)->storage_port,
+                        pServer->status, (*ppFound)->status);
 
 				if (pServer->status == \
 					FDFS_STORAGE_STATUS_DELETED
@@ -4739,6 +4832,11 @@ int tracker_mem_sync_storages(FDFSGroupInfo *pGroup, \
 			{
 				//ignore deleted storage server
 			}
+            else if (pServer->status == FDFS_STORAGE_STATUS_ACTIVE
+			   || pServer->status == FDFS_STORAGE_STATUS_ONLINE)
+            {
+				//ignore online or active storage server
+            }
 			else
 			{
 				FDFSStorageDetail *pStorageServer;

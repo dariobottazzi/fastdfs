@@ -1,4 +1,13 @@
 
+Version 5.04  2014-08-24
+ * add fastdfs.spec for build RPM on Linux
+ * depend on libfastcommon
+ * in multi tracker servers case, when receive higher status like
+   online / active and the storage status is wait_sync or syncing,
+   the tracker adjust storage status to newer, and the storage rejoin
+   to the tracker server
+ * fdfs_monitor support delete empty group
+
 Version 5.03  2014-08-10
  * network send and recv retry when error EINTR happen
  * support mac OS Darwin
