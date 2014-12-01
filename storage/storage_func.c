@@ -124,6 +124,85 @@ static int storage_close_stat_file();
 static int storage_make_data_dirs(const char *pBasePath, bool *pathCreated);
 static int storage_check_and_make_data_dirs();
 
+static int storage_do_get_group_name(ConnectionInfo *pTrackerServer)
+{
+	char out_buff[sizeof(TrackerHeader) + 4];
+	TrackerHeader *pHeader;
+	char *pInBuff;
+	int64_t in_bytes;
+	int result;
+
+	pHeader = (TrackerHeader *)out_buff;
+	memset(out_buff, 0, sizeof(out_buff));
+	long2buff(4, pHeader->pkg_len);
+    int2buff(g_server_port, out_buff + sizeof(TrackerHeader));
+	pHeader->cmd = TRACKER_PROTO_CMD_STORAGE_GET_GROUP_NAME;
+	if ((result=tcpsenddata_nb(pTrackerServer->sock, out_buff, \
+			sizeof(out_buff), g_fdfs_network_timeout)) != 0)
+	{
+		logError("file: "__FILE__", line: %d, " \
+			"tracker server %s:%d, send data fail, " \
+			"errno: %d, error info: %s.", \
+			__LINE__, pTrackerServer->ip_addr, \
+			pTrackerServer->port, \
+			result, STRERROR(result));
+		return result;
+	}
+
+	pInBuff = g_group_name;
+	if ((result=fdfs_recv_response(pTrackerServer, \
+		&pInBuff, FDFS_GROUP_NAME_MAX_LEN, &in_bytes)) != 0)
+	{
+		return result;
+	}
+
+	if (in_bytes != FDFS_GROUP_NAME_MAX_LEN)
+	{
+		logError("file: "__FILE__", line: %d, " \
+			"tracker server %s:%d, recv body length: " \
+			"%"PRId64" != %d",  \
+			__LINE__, pTrackerServer->ip_addr, \
+			pTrackerServer->port, in_bytes, FDFS_GROUP_NAME_MAX_LEN);
+		return EINVAL;
+	}
+
+	return 0;
+}
+
+static int storage_get_group_name_from_tracker()
+{
+	ConnectionInfo *pTrackerServer;
+	ConnectionInfo *pServerEnd;
+	ConnectionInfo *pTrackerConn;
+	ConnectionInfo tracker_server;
+	int result;
+
+	result = ENOENT;
+	pServerEnd = g_tracker_group.servers + g_tracker_group.server_count;
+	for (pTrackerServer=g_tracker_group.servers; \
+		pTrackerServer<pServerEnd; pTrackerServer++)
+	{
+		memcpy(&tracker_server, pTrackerServer, \
+			sizeof(ConnectionInfo));
+		tracker_server.sock = -1;
+        if ((pTrackerConn=tracker_connect_server(&tracker_server, \
+			&result)) == NULL)
+		{
+			continue;
+		}
+
+        result = storage_do_get_group_name(pTrackerConn);
+		tracker_disconnect_server_ex(pTrackerConn, \
+			result != 0 && result != ENOENT);
+		if (result == 0)
+		{
+			return 0;
+		}
+	}
+
+	return result;
+}
+
 static int tracker_get_my_server_id()
 {
 	struct in_addr ip_addr;
@@ -1047,7 +1126,6 @@ int storage_func_init(const char *filename, \
 		{
 			g_fdfs_network_timeout = DEFAULT_NETWORK_TIMEOUT;
 		}
-		g_network_tv.tv_sec = g_fdfs_network_timeout;
 
 		g_server_port = iniGetIntValue(NULL, "port", &iniContext, \
 					FDFS_STORAGE_SERVER_DEF_PORT);
@@ -1085,37 +1163,6 @@ int storage_func_init(const char *filename, \
 		g_client_bind_addr = iniGetBoolValue(NULL, "client_bind", \
 					&iniContext, true);
 
-		pGroupName = iniGetStrValue(NULL, "group_name", &iniContext);
-		if (pGroupName == NULL)
-		{
-			logError("file: "__FILE__", line: %d, " \
-				"conf file \"%s\" must have item " \
-				"\"group_name\"!", \
-				__LINE__, filename);
-			result = ENOENT;
-			break;
-		}
-		if (pGroupName[0] == '\0')
-		{
-			logError("file: "__FILE__", line: %d, " \
-				"conf file \"%s\", " \
-				"group_name is empty!", \
-				__LINE__, filename);
-			result = EINVAL;
-			break;
-		}
-
-		snprintf(g_group_name, sizeof(g_group_name), "%s", pGroupName);
-		if ((result=fdfs_validate_group_name(g_group_name)) != 0) \
-		{
-			logError("file: "__FILE__", line: %d, " \
-				"conf file \"%s\", " \
-				"the group name \"%s\" is invalid!", \
-				__LINE__, filename, g_group_name);
-			result = EINVAL;
-			break;
-		}
-
 		result = fdfs_load_tracker_group_ex(&g_tracker_group, \
 				filename, &iniContext);
 		if (result != 0)
@@ -1141,6 +1188,50 @@ int storage_func_init(const char *filename, \
 		}
 		if (result != 0)
 		{
+			break;
+		}
+
+		pGroupName = iniGetStrValue(NULL, "group_name", &iniContext);
+		if (pGroupName == NULL)
+		{
+            result = storage_get_group_name_from_tracker();
+            if (result == 0)
+            {
+                logInfo("file: "__FILE__", line: %d, " \
+                        "get group name from tracker server, group_name: %s",
+                        __LINE__, g_group_name);
+            }
+            else
+            {
+                logError("file: "__FILE__", line: %d, " \
+                        "conf file \"%s\" must have item " \
+                        "\"group_name\"!", \
+                        __LINE__, filename);
+                result = ENOENT;
+                break;
+            }
+		}
+        else if (pGroupName[0] == '\0')
+		{
+			logError("file: "__FILE__", line: %d, " \
+				"conf file \"%s\", " \
+				"group_name is empty!", \
+				__LINE__, filename);
+			result = EINVAL;
+			break;
+		}
+        else
+        {
+		    snprintf(g_group_name, sizeof(g_group_name), "%s", pGroupName);
+        }
+
+		if ((result=fdfs_validate_group_name(g_group_name)) != 0) \
+		{
+			logError("file: "__FILE__", line: %d, " \
+				"conf file \"%s\", " \
+				"the group name \"%s\" is invalid!", \
+				__LINE__, filename, g_group_name);
+			result = EINVAL;
 			break;
 		}
 
@@ -1627,6 +1718,9 @@ int storage_func_init(const char *filename, \
 		}
 		g_log_context.rotate_size = rotate_error_log_size;
 
+		g_log_file_keep_days = iniGetIntValue(NULL, \
+				"log_file_keep_days", &iniContext, 0);
+
 		g_file_sync_skip_invalid_record = iniGetBoolValue(NULL, \
 			"file_sync_skip_invalid_record", &iniContext, false);
 
@@ -1695,6 +1789,7 @@ int storage_func_init(const char *filename, \
 			"error_log_rotate_time=%02d:%02d, " \
 			"rotate_access_log_size=%"PRId64", " \
 			"rotate_error_log_size=%"PRId64", " \
+			"log_file_keep_days=%d, " \
 			"file_sync_skip_invalid_record=%d, " \
 			"use_connection_pool=%d, " \
 			"g_connection_pool_max_idle_time=%ds", \
@@ -1730,7 +1825,7 @@ int storage_func_init(const char *filename, \
 			g_rotate_error_log, g_error_log_rotate_time.hour, \
 			g_error_log_rotate_time.minute, \
 			g_access_log_context.rotate_size, \
-			g_log_context.rotate_size, \
+			g_log_context.rotate_size, g_log_file_keep_days, \
 			g_file_sync_skip_invalid_record, \
 			g_use_connection_pool, g_connection_pool_max_idle_time);
 

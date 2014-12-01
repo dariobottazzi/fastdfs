@@ -207,11 +207,23 @@ typedef struct
 
 	/* last heart beat time */
 	time_t last_heart_beat_time;
+
+    struct {
+        int alloc_count;
+        volatile int current_count;
+        int max_count;
+    } connection;
 } FDFSStorageStat;
 
 /* struct for network transfering */
 typedef struct
 {
+    struct {
+        char sz_alloc_count[4];
+        char sz_current_count[4];
+        char sz_max_count[4];
+    } connection;
+
 	char sz_total_upload_count[8];
 	char sz_success_upload_count[8];
 	char sz_total_append_count[8];
@@ -411,6 +423,7 @@ typedef struct
 	char id[FDFS_STORAGE_ID_MAX_SIZE];
 	char group_name[FDFS_GROUP_NAME_MAX_LEN + 8];  //for 8 bytes alignment
 	char ip_addr[IP_ADDRESS_SIZE];
+    int port;   //since v5.05
 } FDFSStorageIdInfo;
 
 typedef struct
@@ -432,6 +445,18 @@ typedef struct {
 	int count;   //store path count
 	char **paths; //file store paths
 } FDFSStorePaths;
+
+typedef struct {
+	ConnectionInfo *pTrackerServer;
+	int running_time;     //running seconds, more means higher weight
+	int restart_interval; //restart interval, less mean higher weight
+	bool if_leader;       //if leader
+} TrackerRunningStatus;
+
+typedef struct fdfs_connection_stat {
+    volatile int current_count;
+    int max_count;
+} FDFSConnectionStat;
 
 #endif
 

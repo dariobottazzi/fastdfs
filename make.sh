@@ -74,6 +74,12 @@ else
 fi
 
 LIBS=''
+if [ $OS_BITS -eq 64 ]; then
+  LIBS='-L/usr/lib64'
+else
+  LIBS='-L/usr/lib'
+fi
+
 uname=$(uname)
 if [ "$uname" = "Linux" ]; then
   CFLAGS="$CFLAGS -DOS_LINUX -DIOEVENT_USE_EPOLL"
@@ -198,6 +204,7 @@ if [ "$1" = "install" ]; then
         cp -f conf/tracker.conf $TARGET_CONF_PATH/tracker.conf.sample
         cp -f conf/storage.conf $TARGET_CONF_PATH/storage.conf.sample
         cp -f conf/client.conf $TARGET_CONF_PATH/client.conf.sample
+        cp -f conf/storage_ids.conf $TARGET_CONF_PATH/storage_ids.conf.sample
       fi
       mkdir -p $TARGET_INIT_PATH
       cp -f init.d/fdfs_trackerd $TARGET_INIT_PATH

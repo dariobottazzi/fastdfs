@@ -16,8 +16,6 @@ int g_work_threads = DEFAULT_WORK_THREADS;
 int g_sync_log_buff_interval = SYNC_LOG_BUFF_DEF_INTERVAL;
 int g_check_active_interval = CHECK_ACTIVE_DEF_INTERVAL;
 
-struct timeval g_network_tv = {DEFAULT_NETWORK_TIMEOUT, 0};
-
 FDFSGroups g_groups;
 int g_storage_stat_chg_count = 0;
 int g_storage_sync_time_chg_count = 0; //sync timestamp
@@ -72,4 +70,7 @@ bool g_http_servers_dirty = false;
 #if defined(DEBUG_FLAG) && defined(OS_LINUX)
 char g_exe_name[256] = {0};
 #endif
+
+int g_log_file_keep_days = 0;
+FDFSConnectionStat g_connection_stat = {0, 0};
 

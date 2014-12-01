@@ -1,5 +1,13 @@
 
-Version 5.04  2014-08-24
+Version 5.06  2014-11-30
+ * compile passed in mac OS Darwin
+
+Version 5.05  2014-11-22
+ * tracker_mem.c log more info
+ * remove useless global variable: g_network_tv
+ * storage can fetch it's group_name from tracker server
+
+Version 5.04  2014-09-16
  * add fastdfs.spec for build RPM on Linux
  * depend on libfastcommon
  * in multi tracker servers case, when receive higher status like
@@ -7,6 +15,9 @@ Version 5.04  2014-08-24
    the tracker adjust storage status to newer, and the storage rejoin
    to the tracker server
  * fdfs_monitor support delete empty group
+ * bug fixed: two tracker leaders occur in rare case
+ * add connection stats
+ * delete old log files, add parameter: log_file_keep_days
 
 Version 5.03  2014-08-10
  * network send and recv retry when error EINTR happen

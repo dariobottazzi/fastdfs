@@ -53,8 +53,10 @@ static void tracker_find_max_free_space_group();
 
 int tracker_service_init()
 {
+#define ALLOC_CONNECTIONS_ONCE 1024
 	int result;
 	int bytes;
+    int init_connections;
 	struct nio_thread_data *pThreadData;
 	struct nio_thread_data *pDataEnd;
 	pthread_t tid;
@@ -77,8 +79,11 @@ int tracker_service_init()
 		return result;
 	}
 
-	if ((result=free_queue_init(g_max_connections, TRACKER_MAX_PACKAGE_SIZE,\
-                TRACKER_MAX_PACKAGE_SIZE, sizeof(TrackerClientInfo))) != 0)
+    init_connections = g_max_connections < ALLOC_CONNECTIONS_ONCE ?
+        g_max_connections : ALLOC_CONNECTIONS_ONCE;
+	if ((result=free_queue_init_ex(g_max_connections, init_connections,
+                    ALLOC_CONNECTIONS_ONCE, TRACKER_MAX_PACKAGE_SIZE,
+                    TRACKER_MAX_PACKAGE_SIZE, sizeof(TrackerClientInfo))) != 0)
 	{
 		return result;
 	}
@@ -259,6 +264,15 @@ static void *accept_thread_entrance(void* arg)
 				"errno: %d, error info: %s", \
 				__LINE__, errno, STRERROR(errno));
 		}
+        else
+        {
+            int current_connections;
+            current_connections = __sync_add_and_fetch(&g_connection_stat.
+                    current_count, 1);
+            if (current_connections > g_connection_stat.max_count) {
+                g_connection_stat.max_count = current_connections;
+            }
+        }
 	}
 
 	return NULL;
@@ -879,7 +893,7 @@ static int tracker_deal_notify_next_leader(struct fast_task_info *pTask)
 		g_tracker_leader_chg_count++;
 
 		logError("file: "__FILE__", line: %d, " \
-			"client ip: %s, two leader occur, " \
+			"client ip: %s, two leaders occur, " \
 			"new leader is %s:%d", \
 			__LINE__, pTask->client_ip, \
 			leader.ip_addr, leader.port);
@@ -1106,6 +1120,77 @@ static int tracker_deal_get_storage_id(struct fast_task_info *pTask)
 	return 0;
 }
 
+static int tracker_deal_get_storage_group_name(struct fast_task_info *pTask)
+{
+	char ip_addr[IP_ADDRESS_SIZE];
+	FDFSStorageIdInfo *pFDFSStorageIdInfo;
+    char *pPort;
+    int port;
+	int nPkgLen;
+
+	if (!g_use_storage_id)
+	{
+		logError("file: "__FILE__", line: %d, "
+                "use_storage_id is disabled, can't get group name "
+                "from storage ip and port!", __LINE__);
+		pTask->length = sizeof(TrackerHeader);
+		return EOPNOTSUPP;
+    }
+
+	nPkgLen = pTask->length - sizeof(TrackerHeader);
+	if (nPkgLen < 4)
+	{
+		logError("file: "__FILE__", line: %d, " \
+			"cmd=%d, client ip addr: %s, " \
+			"package size %d is not correct", __LINE__, \
+			TRACKER_PROTO_CMD_STORAGE_GET_GROUP_NAME, \
+			pTask->client_ip, nPkgLen);
+		pTask->length = sizeof(TrackerHeader);
+		return EINVAL;
+	}
+
+	if (nPkgLen == 4)  //port only
+	{
+		strcpy(ip_addr, pTask->client_ip);
+        pPort = pTask->data + sizeof(TrackerHeader);
+	}
+	else  //ip_addr and port
+	{
+		int ip_len;
+
+		ip_len = nPkgLen - 4;
+		if (ip_len >= IP_ADDRESS_SIZE)
+		{
+            logError("file: "__FILE__", line: %d, " \
+                    "ip address is too long, length: %d",
+                    __LINE__, ip_len);
+            pTask->length = sizeof(TrackerHeader);
+            return ENAMETOOLONG;
+		}
+
+		memcpy(ip_addr, pTask->data + sizeof(TrackerHeader), ip_len);
+		*(ip_addr + ip_len) = '\0';
+        pPort = pTask->data + sizeof(TrackerHeader) + ip_len;
+	}
+    port = buff2int(pPort);
+
+    pFDFSStorageIdInfo = fdfs_get_storage_id_by_ip_port(ip_addr, port);
+    if (pFDFSStorageIdInfo == NULL)
+    {
+        logError("file: "__FILE__", line: %d, "
+                "client ip: %s, can't get group name for storage %s:%d",
+                __LINE__, pTask->client_ip, ip_addr, port);
+        pTask->length = sizeof(TrackerHeader);
+        return ENOENT;
+    }
+
+	pTask->length = sizeof(TrackerHeader) + FDFS_GROUP_NAME_MAX_LEN;
+    memset(pTask->data + sizeof(TrackerHeader), 0, FDFS_GROUP_NAME_MAX_LEN);
+	strcpy(pTask->data + sizeof(TrackerHeader), pFDFSStorageIdInfo->group_name);
+
+	return 0;
+}
+
 static int tracker_deal_fetch_storage_ids(struct fast_task_info *pTask)
 {
 	FDFSStorageIdInfo *pIdsStart;
@@ -1158,13 +1243,22 @@ static int tracker_deal_fetch_storage_ids(struct fast_task_info *pTask)
 	pIdsEnd = g_storage_ids_by_ip + g_storage_id_count;
 	for (pIdInfo = pIdsStart; pIdInfo < pIdsEnd; pIdInfo++)
 	{
+        char szPortPart[16];
 		if ((int)(p - pTask->data) > pTask->size - 64)
 		{
 			break;
 		}
 
-		p += sprintf(p, "%s %s %s\n", pIdInfo->id, \
-			pIdInfo->group_name, pIdInfo->ip_addr);
+        if (pIdInfo->port > 0)
+        {
+            sprintf(szPortPart, ":%d", pIdInfo->port);
+        }
+        else
+        {
+            *szPortPart = '\0';
+        }
+		p += sprintf(p, "%s %s %s%s\n", pIdInfo->id,
+			pIdInfo->group_name, pIdInfo->ip_addr, szPortPart);
 	}
 
 	int2buff((int)(pIdInfo - pIdsStart), (char *)pCurrentCount);
@@ -1642,6 +1736,44 @@ static int tracker_deal_ping_leader(struct fast_task_info *pTask)
 	pClientInfo->chg_count.trunk_server = g_trunk_server_chg_count;
 
 	return 0;
+}
+
+static int tracker_deal_reselect_leader(struct fast_task_info *pTask)
+{
+	TrackerClientInfo *pClientInfo;
+	
+	pClientInfo = (TrackerClientInfo *)pTask->arg;
+	if (pTask->length - sizeof(TrackerHeader) != 0)
+	{
+		logError("file: "__FILE__", line: %d, " \
+			"cmd=%d, client ip: %s, package size " \
+			PKG_LEN_PRINTF_FORMAT" is not correct, " \
+			"expect length 0", __LINE__, \
+			TRACKER_PROTO_CMD_TRACKER_NOTIFY_RESELECT_LEADER, \
+			pTask->client_ip, \
+			pTask->length - (int)sizeof(TrackerHeader));
+		pTask->length = sizeof(TrackerHeader);
+		return EINVAL;
+	}
+
+    pTask->length = sizeof(TrackerHeader);
+	if (!g_if_leader_self)
+	{
+		logError("file: "__FILE__", line: %d, " \
+			"cmd=%d, client ip: %s, i am not the leader!", \
+			__LINE__, TRACKER_PROTO_CMD_TRACKER_NOTIFY_RESELECT_LEADER, \
+			pTask->client_ip);
+		return EOPNOTSUPP;
+	}
+
+    g_if_leader_self = false;
+    g_tracker_servers.leader_index = -1;
+    g_tracker_leader_chg_count++;
+
+    logWarning("file: "__FILE__", line: %d, " \
+            "client ip: %s, i be notified that two leaders occur, " \
+            "should re-select leader", __LINE__, pTask->client_ip);
+    return 0;
 }
 
 static int tracker_unlock_by_client(struct fast_task_info *pTask)
@@ -2170,6 +2302,14 @@ static int tracker_deal_server_list_group_storages(struct fast_task_info *pTask)
 				pDest->sz_subdir_count_per_path);
 		long2buff((*ppServer)->current_write_path, \
 				pDest->sz_current_write_path);
+
+
+		int2buff(pStorageStat->connection.alloc_count, \
+				pStatBuff->connection.sz_alloc_count);
+		int2buff(pStorageStat->connection.current_count, \
+				pStatBuff->connection.sz_current_count);
+		int2buff(pStorageStat->connection.max_count, \
+				pStatBuff->connection.sz_max_count);
 
 		long2buff(pStorageStat->total_upload_count, \
 				pStatBuff->sz_total_upload_count);
@@ -3468,6 +3608,13 @@ static int tracker_deal_storage_beat(struct fast_task_info *pTask)
 					sizeof(TrackerHeader));
 		pStat = &(pClientInfo->pStorage->stat);
 
+		pStat->connection.alloc_count = \
+			buff2int(pStatBuff->connection.sz_alloc_count);
+		pStat->connection.current_count = \
+			buff2int(pStatBuff->connection.sz_current_count);
+		pStat->connection.max_count = \
+			buff2int(pStatBuff->connection.sz_max_count);
+
 		pStat->total_upload_count = \
 			buff2long(pStatBuff->sz_total_upload_count);
 		pStat->success_upload_count = \
@@ -3616,6 +3763,9 @@ int tracker_deal_task(struct fast_task_info *pTask)
 		case TRACKER_PROTO_CMD_STORAGE_GET_SERVER_ID:
 			result = tracker_deal_get_storage_id(pTask);
 			break;
+		case TRACKER_PROTO_CMD_STORAGE_GET_GROUP_NAME:
+			result = tracker_deal_get_storage_group_name(pTask);
+			break;
 		case TRACKER_PROTO_CMD_STORAGE_FETCH_STORAGE_IDS:
 			result = tracker_deal_fetch_storage_ids(pTask);
 			break;
@@ -3729,6 +3879,9 @@ int tracker_deal_task(struct fast_task_info *pTask)
 			break;
 		case TRACKER_PROTO_CMD_TRACKER_COMMIT_NEXT_LEADER:
 			result = tracker_deal_commit_next_leader(pTask);
+			break;
+		case TRACKER_PROTO_CMD_TRACKER_NOTIFY_RESELECT_LEADER:
+			result = tracker_deal_reselect_leader(pTask);
 			break;
 		default:
 			logError("file: "__FILE__", line: %d, "  \

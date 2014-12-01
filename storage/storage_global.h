@@ -84,8 +84,6 @@ extern int g_file_distribute_path_mode;
 extern int g_file_distribute_rotate_count;
 extern int g_fsync_after_written_bytes;
 
-extern struct timeval g_network_tv;
-
 extern int g_dist_path_index_high; //current write to high path
 extern int g_dist_path_index_low;  //current write to low path
 extern int g_dist_write_file_count; //current write file count
@@ -167,6 +165,8 @@ extern int g_http_trunk_size;
 #if defined(DEBUG_FLAG) && defined(OS_LINUX)
 extern char g_exe_name[256];
 #endif
+
+extern int g_log_file_keep_days;
 
 extern struct storage_nio_thread_data *g_nio_thread_data;  //network io thread data
 extern struct storage_dio_thread_data *g_dio_thread_data;  //disk io thread data

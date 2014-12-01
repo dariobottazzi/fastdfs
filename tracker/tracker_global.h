@@ -47,8 +47,6 @@ extern FDFSStorageReservedSpace g_storage_reserved_space;
 extern int g_sync_log_buff_interval; //sync log buff to disk every interval seconds
 extern int g_check_active_interval; //check storage server alive every interval seconds
 
-extern struct timeval g_network_tv;
-
 extern int g_allow_ip_count;  /* -1 means match any ip address */
 extern in_addr_t *g_allow_ip_addrs;  /* sorted array, asc order */
 extern struct base64_context g_base64_context;
@@ -96,6 +94,9 @@ extern bool g_http_servers_dirty;
 #if defined(DEBUG_FLAG) && defined(OS_LINUX)
 extern char g_exe_name[256];
 #endif
+
+extern int g_log_file_keep_days;
+extern FDFSConnectionStat g_connection_stat;
 
 #ifdef __cplusplus
 }
